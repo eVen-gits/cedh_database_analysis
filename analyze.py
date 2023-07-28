@@ -769,6 +769,7 @@ def create_core(colors, ratio=0.75):
 
     return "\n".join([f"1 {c}" for c in sorted(core, key=lambda x: aggregate[x], reverse=True)])
 
+
 def load_commander_decks(commander):
     scry = load_scryfall()
     commanders = commander.split(" / ")
@@ -778,7 +779,7 @@ def load_commander_decks(commander):
 
     color_order = 'WUBRGC'
     cid = []
-    for color in 'WUBRGC':
+    for color in color_order:
         for commander in commanders:
             if color in commander.color_identity:
                 cid += color
@@ -786,6 +787,7 @@ def load_commander_decks(commander):
     cid = ''.join(cid)
 
     data_complex = load_database()
+    data_flat = load_normalized()
 
     n_commanders = len(commanders)
 
@@ -803,7 +805,8 @@ def load_commander_decks(commander):
             data.update(data_complex[cid][key2])
     else:
         raise Exception(f"Invalid number of commanders: {n_commanders}")
-    return data
+    return {deck: data_flat[deck] for deck in data}
+
 
 def create_commander_core(commander, ratio=0.75, n=None):
     data = load_commander_decks(commander)
@@ -842,7 +845,7 @@ def recommend_commander_cuts(decklist, commander, n=20):
 
     master = {}
     for deck in flat_dataset:
-        cur_filtered = filter(lambda x: x in decklist.values(), flat_dataset[deck])
+        cur_filtered = filter(lambda x: x in decklist, flat_dataset[deck])
         cur_score = similarity(df, decklist_vec, deck)
 
         for card in cur_filtered:
@@ -858,9 +861,17 @@ def recommend_commander_cuts(decklist, commander, n=20):
 
     output = ""
 
+    cuts = sorted(decklist, key=measure)
+
+    return [
+        (x, measure(x))
+        for x in cuts[:n]
+    ]
+
+
     for i, card in enumerate(sorted(decklist, key=measure)):
         numbering = f"{i+1}.".ljust(4, " ")
-        card_name = f"{decklist[card]}".ljust(40, " ")
+        card_name = f"{card}".ljust(40, " ")
 
         output += (
             f"{numbering}{card_name} "
@@ -868,6 +879,21 @@ def recommend_commander_cuts(decklist, commander, n=20):
         )
 
     return output
+
+def stringify(data_list):
+    lines = [None] * len(data_list)
+
+    for data in data_list:
+        if isinstance(data, Iterable):
+            for col in data:
+                try:
+                    lines.append(f"{col:.2f}")
+                except:
+                    lines.append(str(col))
+            pass
+        else:
+            lines.append(str(data))
+
 
 if __name__ == "__main__":
 
@@ -957,13 +983,13 @@ if __name__ == "__main__":
     with open("decklist.txt", "r") as f:
         decklist = f.read()
 
-    clean_decklist = {}
+    clean_decklist = []
 
     for card in decklist.split("\n"):
         if card:
             clean_card = " ".join(card.split()[1:])
-            clean_decklist[normalize(clean_card)] = clean_card
-
-    recommend_commander_cuts(clean_decklist, "Tivit, Seller of Secrets", n=20)
-
+            clean_decklist.append(normalize(clean_card))
+    cuts = recommend_commander_cuts(clean_decklist, "Tivit, Seller of Secrets", n=20)
+    print(stringify(cuts))
+    pass
 

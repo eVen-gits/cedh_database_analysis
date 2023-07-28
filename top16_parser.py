@@ -19,7 +19,7 @@ import atexit
 base_url = "https://edhtop16.com/api/"
 headers = {'Content-Type': 'application/json', 'Accept': 'application/json'}
 
-MOXFIELD_RATE_LIMIT = 0 # [s]
+MOXFIELD_RATE_LIMIT = 1 # [s]
 
 DEFAULT_QUERY = {
     'standing': {'$lte': 16},
@@ -172,6 +172,7 @@ def build_master_json(data):
 
 def parse_decklists(master_json):
     pbar_1 = tqdm(master_json.items(), desc='Color', leave=False)
+    del_keys = set()
     for color, commanders in pbar_1:
         pbar_1.set_description('{}'.format(color))
         pbar_2 = tqdm(commanders.items(), desc='Commander', leave=False)
@@ -190,15 +191,19 @@ def parse_decklists(master_json):
                             'decklist': decklist,
                             'time': time.time()
                         }
+                    if decklist is not None:
+                        master_json[color][commander][entry] = decklist
 
-                    master_json[color][commander][entry] = decklist
                 except Exception as e:
                     #clear TQDM buffer
                     #print('\r{} parsing decklist: {}'.format(e, url), flush=True)
+                    del_keys.add((color, commander, entry))
                     PARSER_CACHE[url] = {
                         'decklist': None,
                         'time': time.time()
                     }
+    for key in del_keys:
+        del master_json[key[0]][key[1]][key[2]]
     return master_json
 
 def decode_url_query(url):
